@@ -36,7 +36,7 @@ ORDER BY SUM(sa.salary) DESC;
 --Answer: David Price made the most, with nearly a quarter billion dollars
 
 -- 4. Using the fielding table, group players into three groups based on their position: label players with position OF as "Outfield", those with position "SS", "1B", "2B", and "3B" as "Infield", and those with position "P" or "C" as "Battery". Determine the number of putouts made by each of these three groups in 2016.
-'SELECT yearid, 
+SELECT yearid, 
 CASE WHEN pos = 'SS' OR pos = '1B' OR pos = '2B' OR pos = '3B' THEN 'Infield'
 WHEN pos = 'P' OR pos = 'C' THEN 'Battery'
 ELSE 'Outfield'
@@ -44,22 +44,34 @@ END AS positions,
 SUM(po) AS putout
 FROM fielding
 WHERE yearid = 2016
-GROUP BY  positions, yearid, po;'
+GROUP BY  positions, yearid
+ORDER BY putout;
 
-select *
-FROM teams
+/*Answer:   "Outfield"	29560
+			"Battery"	41424
+			"Infield"	58934*/
+'select *
+FROM teams'
 -- 5.Find the average number of strikeouts per game by decade since 1920. Round the numbers you report to 2 decimal places. Do the same for home runs per game. Do you see any trends?
-'SELECT DATE_PART('decade', yearid), ROUND(AVG(SO), 2) AS Strike_out
+SELECT CASE WHEN yearid BETWEEN 1920 AND 1929 THEN 1
+WHEN yearid BETWEEN 1930 AND 1939 THEN 2
+WHEN yearid BETWEEN 1940 AND 1949 THEN 3
+WHEN yearid BETWEEN 1950 AND 1959 THEN 4
+WHEN yearid BETWEEN 1960 AND 1969 THEN 5
+WHEN yearid BETWEEN 1970 AND 1979 THEN 6
+WHEN yearid BETWEEN 1980 AND 1989 THEN 7
+WHEN yearid BETWEEN 1990 AND 1999 THEN 8
+WHEN yearid BETWEEN 2000 AND 2009 THEN 9
+ELSE 10 END AS decades, ROUND(AVG(SO), 2) AS Strike_out
 FROM teams
 WHERE yearid >= 1920
 GROUP BY yearid
-ORDER BY yearid DESC;
-
-SELECT yearid, cg, ROUND(AVG(HR), 2) as Homers
+UNION
+(SELECT cg, ROUND(AVG(HR), 2) as Homers
 FROM teams
 WHERE yearid >= 1920
-GROUP BY yearid, cg
-ORDER BY CG DESC;'
+GROUP BY yearid, cg)
+ORDER BY strike_out DESC;
 
 -- 6.Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.
 SELECT p.namefirst, p.namelast, b.yearid, SUM(sb) AS stolen_bases_nm, SUM(sb)/SUM(sb)+SUM(cs) AS success_perc
@@ -83,10 +95,25 @@ FROM teams
 WHERE yearid BETWEEN 1970 AND 2016 AND wswin IS NOT NULL
 ORDER BY w;
 --Answer: Toronto Blue Jays went to the world series with only 37 years.
-'SELECT yearid, name, w, wswin
+WITH winner AS
+(SELECT MAX(w) AS win_win, yearid
 FROM teams
-WHERE yearid BETWEEN 1970 AND 1980 OR yearid >= 1982
-ORDER BY w DESC;'
+WHERE wswin = 'Y'
+GROUP BY yearid),
+loser AS
+(SELECT MAX(w) AS win_lose, yearid
+FROM teams
+WHERE wswin = 'N'
+GROUP BY yearid)
+SELECT 
+ROUND(AVG(CASE WHEN win_win >= win_lose THEN 1 
+		  ELSE 0 END)*100,1) AS win_percent
+ FROM winner
+ INNER JOIN loser
+ ON winner.yearid = loser.yearid
+ ORDER BY win_percent DESC;
+--Answer: 43.6%
+
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
 SELECT DISTINCT t.name, parks.park_name, AVG(h.attendance)/SUM(h.games) AS total_attendance 
 FROM homegames AS h
@@ -125,5 +152,74 @@ LIMIT 5;
 "Pittsburgh Pirates" at "PNC Park"*/
 
 -- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+with NL as (
+select *
+from awardsmanagers
+where lgid = 'NL'),
+AL as (
+select *
+from awardsmanagers
+where lgid = 'AL')
+select DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)), NL.playerid,
+NL.lgid, m.yearid,
+AL.lgid
+from NL
+inner join AL
+on NL.playerid = AL.playerid
+left join managers as m
+on NL.playerid = m.playerid
+left join people as p
+ ON p.playerid =nl.playerid
+where NL.awardid ilike '%TSN Manager%'
+and AL.awardid ilike '%TSN Manager%'
 
 -- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+SELECT DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)) AS fullname,  MAX(b.hr) as max_homers, b.yearid
+FROM batting AS b
+JOIN people AS p
+ON p.playerid = b.playerid
+WHERE b.yearid = 2016 AND Max(b.hr)> 1 
+GROUP BY fullname, yearid
+ORDER BY max_homers DESC;
+
+
+--CTE from PHIL
+-- WITH winner AS 
+-- (SELECT MAX(w) AS winnerwins,
+--  yearid
+--  FROM teams
+--  WHERE wswin = 'y'
+--  GROUP BY yearid), 
+--  loser AS (SELECT MAX(w) AS loserwins,
+-- yearid
+-- FROM teams
+-- WHERE wswin = 'N'
+-- GROUP BY yearid)
+-- SELECT ROUND(AVG(CASE WHEN winnerwins >= loserwins THEN 1
+-- 				ELSE 0 END)*100,1) AS winpct
+-- FROM winner
+-- INNER JOIN loser
+-- ON winner.yearid = loser.yearid
+
+
+--2nd one from PHIL
+-- with NL as (
+-- select *
+-- from awardsmanagers
+-- where lgid = 'NL'),
+-- AL as (
+-- select *
+-- from awardsmanagers
+-- where lgid = 'AL')
+-- select DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)), NL.playerid,
+-- NL.lgid,
+-- AL.lgid
+-- from NL
+-- inner join AL
+-- on NL.playerid = AL.playerid
+-- left join managers as m
+-- on NL.playerid = m.playerid
+-- left join people as p
+--  ON p.playerid =nl.playerid
+-- where NL.awardid ilike '%TSN Manager%'
+-- and AL.awardid ilike '%TSN Manager%'
