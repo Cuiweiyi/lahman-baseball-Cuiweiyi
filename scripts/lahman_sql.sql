@@ -53,48 +53,83 @@ ORDER BY putout;
 'select *
 FROM teams'
 -- 5.Find the average number of strikeouts per game by decade since 1920. Round the numbers you report to 2 decimal places. Do the same for home runs per game. Do you see any trends?
-SELECT CASE WHEN yearid BETWEEN 1920 AND 1929 THEN 1
-WHEN yearid BETWEEN 1930 AND 1939 THEN 2
-WHEN yearid BETWEEN 1940 AND 1949 THEN 3
-WHEN yearid BETWEEN 1950 AND 1959 THEN 4
-WHEN yearid BETWEEN 1960 AND 1969 THEN 5
-WHEN yearid BETWEEN 1970 AND 1979 THEN 6
-WHEN yearid BETWEEN 1980 AND 1989 THEN 7
-WHEN yearid BETWEEN 1990 AND 1999 THEN 8
-WHEN yearid BETWEEN 2000 AND 2009 THEN 9
-ELSE 10 END AS decades, ROUND(AVG(SO), 2) AS Strike_out
+-- ORIGINAL CODE THAT WOULD NOT WORK. 我就笨蛋的很
+--WITH Strikes AS
+-- (SELECT CONCAT(LEFT(CAST(yearid AS text), 3), '0s')AS decade,
+--  ROUND(AVG(hr)/SUM(g), 2) AS Strike_out, ROUND(AVG(HR)/SUM(g), 2) as Homers, 
+--  SUM(hr) AS num_hr,
+--  SUM(g) AS games
+-- FROM teams
+-- WHERE yearid >= 1920
+-- GROUP BY decade),
+
+-- Home AS
+-- (SELECT CONCAT(LEFT(CAST(yearid AS text), 3), '0s')AS decade,
+--  ROUND(AVG(HR)/SUM(g), 2) as Homers, SUM(hr) AS num_hr, SUM(g) AS games
+-- FROM teams
+-- WHERE yearid >= 1920
+-- GROUP BY decade
+-- ORDER BY decade)
+
+-- SELECT decade, strike_out
+-- FROM strikes
+-- UNION
+-- SELECT CAST(homers AS numeric), CAST(num_hr AS numeric)
+-- FROM home
+-- GROUP BY decade, num_hr, homers
+-- ORDER BY decade
+
+SELECT 
+	ROUND(AVG(so),2) AS 我笨死了,
+	ROUND(AVG(hr),2) AS 加油,
+	/*CASE WHEN yearid BETWEEN 1920 AND 1929 THEN '1920s'
+		 WHEN yearid BETWEEN 1930 AND 1939 THEN '1930s'
+		 WHEN yearid BETWEEN 1940 AND 1949 THEN '1940s'
+		 WHEN yearid BETWEEN 1950 AND 1959 THEN '1950s'
+		 WHEN yearid BETWEEN 1960 AND 1969 THEN '1960s'
+		 WHEN yearid BETWEEN 1970 AND 1979 THEN '1970s'
+		 WHEN yearid BETWEEN 1980 AND 1989 THEN '1980s'
+		 WHEN yearid BETWEEN 1990 AND 1999 THEN '1990s'
+		 WHEN yearid BETWEEN 2000 AND 2009 THEN '2000s'
+		 WHEN yearid BETWEEN 2010 AND 2019 THEN '2010s' 
+		 END AS decade*/
+ CONCAT(LEFT(CAST(yearid AS text), 3), '0s') AS decade
 FROM teams
 WHERE yearid >= 1920
-GROUP BY yearid
-UNION
-(SELECT cg, ROUND(AVG(HR), 2) as Homers
-FROM teams
-WHERE yearid >= 1920
-GROUP BY yearid, cg)
-ORDER BY strike_out DESC;
+GROUP BY 
+	decade
+ORDER BY 
+	decade;
 
 -- 6.Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.
-SELECT p.namefirst, p.namelast, b.yearid, SUM(sb) AS stolen_bases_nm, SUM(sb)/SUM(sb)+SUM(cs) AS success_perc
+SELECT p.namefirst,
+p.namelast, 
+b.yearid,
+sb AS stolen_bases_nm,
+cs,
+ROUND((CAST(sb AS numeric) / (CAST(sb AS numeric) + CAST(cs AS numeric))), 2) AS success_perc
 FROM batting AS b
 LEFT JOIN people AS p
 ON b.playerid = p.playerid
 WHERE yearid = 2016
-GROUP BY  p.namefirst, p.namelast, b.yearid
-HAVING SUM(sb) >= 20
+GROUP BY  p.namefirst, p.namelast, b.yearid, sb, cs
+HAVING sb + cs >= 20
 ORDER BY success_perc DESC;
---Answer: Jonathan Villar had a 19% success rate, with 62 bases stolen in 2016.
+--Answer: Chris Owings had a 91% success rate.
+
 
 -- 7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
-SELECT name, w
+SELECT DISTINCT name, yearid, wswin, MAX(w) 
 FROM teams
-WHERE yearid BETWEEN 1970 AND 2016 AND wswin IS NULL
-ORDER BY w DESC;
---Answer: Montreal Expos had 74 wins and did not go to the world series
-SELECT yearid, name, w 
+WHERE yearid >= 1970 AND wswin LIKE 'N'
+group by DISTINCT name, yearid, wswin
+ORDER BY MAX(w) DESC;
+--Answer: Seattle Mariners had 7116 wins and did not win the world series
+SELECT DISTINCT name, yearid, wswin, w 
 FROM teams
-WHERE yearid BETWEEN 1970 AND 2016 AND wswin IS NOT NULL
+WHERE yearid >= 1970 AND wswin LIKE 'Y'
 ORDER BY w;
---Answer: Toronto Blue Jays went to the world series with only 37 years.
+--Answer: Los Angeles Dogers went to the world series and won with only 63 years.
 WITH winner AS
 (SELECT MAX(w) AS win_win, yearid
 FROM teams
@@ -150,39 +185,80 @@ LIMIT 5;
 "Cleveland Indians"	at "Progressive Field"
 "Cincinnati Reds" at "Great American Ballpark"
 "Pittsburgh Pirates" at "PNC Park"*/
-
+select *
+from awardsmanagers
 -- 9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
-with NL as (
-select *
-from awardsmanagers
-where lgid = 'NL'),
-AL as (
-select *
-from awardsmanagers
-where lgid = 'AL')
-select DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)), NL.playerid,
-NL.lgid, m.yearid,
-AL.lgid
-from NL
-inner join AL
-on NL.playerid = AL.playerid
-left join managers as m
-on NL.playerid = m.playerid
-left join people as p
- ON p.playerid =nl.playerid
-where NL.awardid ilike '%TSN Manager%'
-and AL.awardid ilike '%TSN Manager%'
+WITH Lwinners AS (
+SELECT a.yearid, CONCAT(p.namefirst, ' ', p.namelast) AS fullname, a.lgid, a.playerid, awardid
+FROM awardsmanagers AS a
+LEFT JOIN people AS p
+	ON p.playerid = a.playerid
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year'
+GROUP BY a.yearid, fullname, a.lgid, a.playerid, awardid)
+
+wolf_fang AS(
+SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, a.lgid, a.playerid, awardid
+FROM awardsmanagers AS a
+LEFT JOIN people AS p
+USING (playerid)
+)
+
+SELECT COALESCE(fullname) AS full_name, lwinners.awardid, lwinners.lgid, t.name
+FROM lwinners
+JOIN people AS b
+ON lwinners.playerid = b.playerid
+JOIN managershalf
+ON b.playerid = managershalf.playerid 
+LEFT JOIN teams AS t
+ON managershalf.teamid = t.teamid
+WHERE awardid = 'TSN Manager of the Year'
+GROUP BY full_name, t.name, lwinners.lgid, awardid 
+ORDER BY Full_name;
+--Answer: Tony LaRussa for the Chicago White Sox and Bobby Cox for the Atlanta Braves
+
+-- with NL as (
+-- select *
+-- from awardsmanagers
+-- where lgid = 'NL'),
+-- AL as (
+-- select *
+-- from awardsmanagers
+-- where lgid = 'AL')
+-- select DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)), NL.playerid,
+-- NL.lgid, m.yearid,
+-- AL.lgid
+-- from NL
+-- inner join AL
+-- on NL.playerid = AL.playerid
+-- left join managers as m
+-- on NL.playerid = m.playerid
+-- left join people as p
+--  ON p.playerid =nl.playerid
+-- where NL.awardid ilike '%TSN Manager%'
+-- and AL.awardid ilike '%TSN Manager%'
 
 -- 10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
-SELECT DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)) AS fullname,  MAX(b.hr) as max_homers, b.yearid
+WITH highs AS (
+SELECT DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)) AS fullname,  
+b.hr, 
+b.yearid
 FROM batting AS b
 JOIN people AS p
 ON p.playerid = b.playerid
-WHERE b.yearid = 2016 AND Max(b.hr)> 1 
+WHERE DATE_PART('year', CAST(debut AS DATE)) = 2006
+GROUP BY ROLLUP(fullname, yearid)),
+
+SELECT
+DISTINCT(CONCAT(namefirst, ' ', namelast)) AS full_name,  
+MAX(hr) AS homers, AVG(hr) AS avg_home,
+yearid
+FROM highs
+WHERE highs.yearid = 2016 AND highs.hr > 1 AND homers > avg_home
 GROUP BY fullname, yearid
 ORDER BY max_homers DESC;
 
-
+SELECT debut
+FROM people
 --CTE from PHIL
 -- WITH winner AS 
 -- (SELECT MAX(w) AS winnerwins,
@@ -223,3 +299,33 @@ ORDER BY max_homers DESC;
 --  ON p.playerid =nl.playerid
 -- where NL.awardid ilike '%TSN Manager%'
 -- and AL.awardid ilike '%TSN Manager%'
+
+SELECT DISTINCT(CONCAT(p.namefirst, ' ', p.namelast)) AS fullname,  
+b.hr, 
+b.yearid
+FROM batting AS b
+JOIN people AS p
+ON p.playerid = b.playerid
+WHERE DATE_PART('year', CAST(debut AS DATE)) = 2006
+GROUP BY ROLLUP(fullname, yearid)
+
+-- from Jasmine Drumright
+-- -- -- -- -- SELECT
+-- -- -- -- -- 	DISTINCT yearid,
+-- -- -- -- -- 	name,
+-- -- -- -- -- 	wswin,
+-- -- -- -- -- 	wins,
+-- -- -- -- -- 	mostwins
+-- -- -- -- -- FROM(
+-- -- -- -- -- 	SELECT
+-- -- -- -- -- 		DISTINCT yearid,
+ 		name,
+wswin,
+ 		w AS wins,
+		MAX(w) OVER(PARTITION BY yearid) AS mostwins
+ 	FROM teams
+ 	WHERE yearid >= 1970
+ 	ORDER BY yearid DESC) AS subquery
+ WHERE wswin LIKE 'Y'
+AND wins = mostwins
+ ORDER BY yearid DESC;
