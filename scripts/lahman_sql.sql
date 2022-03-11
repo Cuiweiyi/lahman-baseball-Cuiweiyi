@@ -194,16 +194,17 @@ FROM awardsmanagers AS a
 LEFT JOIN people AS p
 	ON p.playerid = a.playerid
 WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year'
-GROUP BY a.yearid, fullname, a.lgid, a.playerid, awardid)
+GROUP BY a.yearid, fullname, a.lgid, a.playerid, awardid),
 
 wolf_fang AS(
-SELECT CONCAT(p.namefirst, ' ', p.namelast) AS fullname, a.lgid, a.playerid, awardid
+SELECT a.yearid, CONCAT(p.namefirst, ' ', p.namelast) AS fullname, a.lgid, a.playerid, awardid
 FROM awardsmanagers AS a
 LEFT JOIN people AS p
-USING (playerid)
-)
+	ON p.playerid = a.playerid
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year'
+GROUP BY a.yearid, fullname, a.lgid, a.playerid, awardid)
 
-SELECT COALESCE(fullname) AS full_name, lwinners.awardid, lwinners.lgid, t.name
+SELECT COALESCE(lwinners.fullname) AS full_name, lwinners.awardid, lwinners.lgid, t.name
 FROM lwinners
 JOIN people AS b
 ON lwinners.playerid = b.playerid
@@ -211,9 +212,11 @@ JOIN managershalf
 ON b.playerid = managershalf.playerid 
 LEFT JOIN teams AS t
 ON managershalf.teamid = t.teamid
-WHERE awardid = 'TSN Manager of the Year'
-GROUP BY full_name, t.name, lwinners.lgid, awardid 
-ORDER BY Full_name;
+full JOIN wolf_fang
+ON lwinners.playerid = wolf_fang.playerid AND lwinners.awardid = wolf_fang.awardid
+WHERE wolf_fang.awardid = 'TSN Manager of the Year'
+GROUP BY full_name, t.name, lwinners.lgid, lwinners.awardid 
+ORDER BY full_name;
 --Answer: Tony LaRussa for the Chicago White Sox and Bobby Cox for the Atlanta Braves
 
 -- with NL as (
